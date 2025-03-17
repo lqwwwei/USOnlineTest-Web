@@ -85,8 +85,6 @@
       <!--      <el-table-column label="知识点ID" align="center" prop="id" />-->
       <el-table-column label="知识点名称" align="center" prop="name"/>
       <el-table-column label="父级知识点ID" align="center" prop="parentId"/>
-      <el-table-column label="层级深度" align="center" prop="level"/>
-      <el-table-column label="路径" align="center" prop="path"/>
       <el-table-column label="创建时间" align="center" prop="createdAt" width="180">
         <template #default="{ row }">
           <span>{{ formatDate(row.createdAt) }}</span>
@@ -129,25 +127,27 @@
     />
     <!-- 新增/修改对话框 -->
     <el-dialog :title="title" v-model="open" width="500px" append-to-body>
-      <el-form ref="form" :model="form" :rules="rules" label-width="80px">
-        <el-form-item label="知识点名称" prop="name">
+      <el-form ref="pointform" :model="form" :rules="rules" label-width="80px">
+        <el-form-item label="知识点" prop="name">
           <el-input v-model="form.name" placeholder="请输入知识点名称"/>
         </el-form-item>
-        <el-form-item label="父级知识点ID" prop="parentId">
-          <el-input v-model="form.parentId" placeholder="请输入父级知识点ID"/>
+        <el-form-item label="父级" prop="parentId">
+          <el-select v-model="form.parentId" placeholder="请选择父级知识点">
+            <el-option
+                v-for="item in pointList"
+                :key="item.id"
+                :label="item.name"
+                :value="item.id">
+            </el-option>
+          </el-select>
         </el-form-item>
-        <el-form-item label="层级深度" prop="level">
-          <el-input v-model="form.level" placeholder="请输入层级深度"/>
-        </el-form-item>
-        <el-form-item label="路径" prop="path">
-          <el-input v-model="form.path" placeholder="请输入路径"/>
-        </el-form-item>
+
         <el-form-item label="创建时间" prop="createdAt">
           <el-date-picker
               clearable
               v-model="form.createdAt"
               type="date"
-              value-format="yyyy-MM-dd"
+              value-format="YYYY-MM-DD"
               placeholder="请选择创建时间"
           />
         </el-form-item>
@@ -165,6 +165,7 @@ import {ref, reactive, onMounted} from 'vue';
 import {listPoint, getPoint, delPoint, addPoint, updatePoint} from '@/api/routineExams/point';
 import {ElMessage, ElMessageBox} from 'element-plus';
 
+
 // 状态管理
 const loading = ref(true);
 const showSearch = ref(true);
@@ -178,32 +179,34 @@ const multiple = ref(true);
 const ids = ref([]);
 
 // 查询参数
-const queryParams = reactive({
-  pageNum: 1,
-  pageSize: 10,
-  name: null,
-  parentId: null,
-  level: null,
-  path: null,
-  createdAt: null,
-});
+const data = reactive({
+   queryParams:{
+    pageNum: 1,
+    pageSize: 10,
+    name: null,
+    parentId: null,
+    level: null,
+    path: null,
+    createdAt: null,
+  },
 
 // 表单数据
-const form = reactive({
-  id: null,
-  name: null,
-  parentId: null,
-  level: null,
-  path: null,
-  createdAt: null,
-});
+   form:{
+    id: null,
+    name: null,
+    parentId: null,
+    level: null,
+    path: null,
+    createdAt: null,
+  },
 
 // 表单校验规则
-const rules = reactive({
-  name: [{required: true, message: '知识点名称不能为空', trigger: 'blur'}],
-  level: [{required: true, message: '层级深度不能为空', trigger: 'blur'}],
-});
-
+   rules :{
+    name: [{required: true, message: '知识点名称不能为空', trigger: 'blur'}],
+    level: [{required: true, message: '层级深度不能为空', trigger: 'blur'}],
+  }
+})
+const { queryParams, form, rules } = toRefs(data)
 // 初始化加载数据
 onMounted(() => {
   getList();
@@ -248,24 +251,15 @@ const buildTree = (data) => {
 };
 
 // 搜索
-const handleQuery = () => {
+function handleQuery(queryParams)  {
   queryParams.pageNum = 1;
   getList();
-};
+}
 
 // 重置搜索
-const resetQuery = () => {
-  Object.assign(queryParams, {
-    pageNum: 1,
-    pageSize: 10,
-    name: null,
-    parentId: null,
-    level: null,
-    path: null,
-    createdAt: null,
-  });
+function resetQuery() {
   handleQuery();
-};
+}
 
 // 多选框选中
 const handleSelectionChange = (selection) => {
@@ -275,47 +269,48 @@ const handleSelectionChange = (selection) => {
 };
 
 // 新增
-const handleAdd = () => {
-  resetForm();
+function handleAdd(){
+  reset()
   open.value = true;
   title.value = '新增知识点';
-};
+}
 
 // 修改
-const handleUpdate = async (row) => {
-  resetForm();
+async function handleUpdate(row) {
+  reset();
   const id = row.id || ids.value[0];
   try {
     const res = await getPoint(id);
-    Object.assign(form, res.data);
+    // 确保使用 .value 来更新响应式对象
+    Object.assign(form.value, res.data);
     open.value = true;
     title.value = '修改知识点';
   } catch (error) {
     ElMessage.error('获取数据失败');
   }
-};
+}
 
 // 删除
-const handleDelete = async (row) => {
+async function handleDelete(row) {
   const id = row.id || ids.value;
   try {
     await ElMessageBox.confirm('是否确认删除选中的数据项？', '提示', {type: 'warning'});
     await delPoint(id);
     ElMessage.success('删除成功');
-    getList();
+    await getList();
   } catch (error) {
     ElMessage.info('取消删除');
   }
-};
+}
 
 // 提交表单
-const submitForm = async () => {
+async function submitForm()  {
   try {
-    if (form.id) {
-      await updatePoint(form);
+    if (form.value.id) {
+      await updatePoint(form.value);
       ElMessage.success('修改成功');
     } else {
-      await addPoint(form);
+      await addPoint(form.value);
       ElMessage.success('新增成功');
     }
     open.value = false;
@@ -323,25 +318,25 @@ const submitForm = async () => {
   } catch (error) {
     ElMessage.error('操作失败');
   }
-};
+}
 
 // 重置表单
-const resetForm = () => {
-  Object.assign(form, {
+function reset() {
+  form.value = {
     id: null,
     name: null,
     parentId: null,
     level: null,
     path: null,
     createdAt: null,
-  });
-};
+  }
+}
 
 // 取消
-const cancel = () => {
+function cancel () {
   open.value = false;
-  resetForm();
-};
+  reset()
+}
 
 // 格式化日期
 const formatDate = (date) => {
