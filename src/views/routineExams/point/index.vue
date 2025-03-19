@@ -215,7 +215,7 @@ onMounted(() => {
 const getList = async () => {
   loading.value = true;
   try {
-    const res = await listPoint(queryParams);
+    const res = await listPoint(queryParams.value);
     pointList.value = res.rows;
     total.value = res.total;
     // 将平铺数据转换为树形结构
