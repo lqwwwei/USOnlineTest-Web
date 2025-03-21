@@ -84,3 +84,11 @@ export function delQuestiontype(id) {
         method: 'delete'
     })
 }
+
+export function listQuestionsByIds(ids) {
+    return request({
+        url: '/system/question/listByIds',
+        method: 'post',
+        data: ids // 直接传递试题ID集合
+    });
+}
