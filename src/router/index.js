@@ -83,7 +83,13 @@ export const constantRoutes = [
         meta: { title: '个人中心', icon: 'user' }
       }
     ]
-  }
+  },
+  {
+    path: '/exam',
+    name: 'ExamPage',
+    component: () => import('@/views/routineExams/exam/index'),
+    hidden: true
+  } //考试页面
 ]
 
 // 动态路由，基于用户权限动态去加载

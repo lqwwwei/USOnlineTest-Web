@@ -200,6 +200,7 @@ import {ElMessage, ElMessageBox} from "element-plus";
 import {listQuestiontype} from "@/api/routineExams/question";
 import {listPoint} from "@/api/routineExams/point";
 import { listQuestionsByIds } from '@/api/routineExams/question';
+import {useRouter} from "vue-router";
 const loading = ref(true);
 const showSearch = ref(true);
 const total = ref(0);
@@ -211,7 +212,7 @@ const open = ref(false);
 const title = ref('');
 const typeList = ref([]);
 const pointList = ref([]);
-
+const router = useRouter()
 const data = reactive({
   form: {
     id: null,
@@ -357,26 +358,22 @@ function handleDelete(row) {
       });
 }
 function preview(row) {
-  // 假设 row.questionIds 是一个试题ID的数组
-  const questionIds = row.questionIds;
-  const idsArray = questionIds.split(',').map(id => Number(id.trim()));
-  if (!questionIds || questionIds.length === 0) {
-    ElMessage.warning('该试卷暂无试题');
+  if (!row.id) {
+    ElMessage.warning('试卷ID无效');
     return;
   }
 
-  // 发送 POST 请求获取试题信息
-  listQuestionsByIds(idsArray)
-      .then(response => {
-        // 处理返回的试题数据
-        const questions = response.data;
-        console.log('试题列表:', questions);
-
-      })
-      .catch(error => {
-        console.error('获取试题失败:', error);
-        ElMessage.error('获取试题失败，请稍后重试');
-      });
+  try {
+    // 跳转到目标页面，并传递试卷 ID
+    router.push({
+      name: 'ExamPage',
+      query: {
+        examId: row.id // 传递试卷 ID
+      }
+    });
+  } catch (error) {
+    console.error('跳转失败:', error);
+  }
 }
 
 function handleExport() {
