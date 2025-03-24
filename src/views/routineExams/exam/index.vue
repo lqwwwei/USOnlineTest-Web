@@ -8,6 +8,12 @@
       <div>考试名称</div>
     </div>
     <div class="Exam-header-right">
+      <div class="status-box">
+        <div class="status-text">{{ nickName }}</div>
+      </div>
+      <div class="status-box">
+        <div class="status-text" style="color: #1c80f2">考试中</div>
+      </div>
       <div class="avatar-container">
         <div class="avatar-wrapper">
           <img :src="userStore.avatar" class="user-avatar" alt="用户头像"/>
@@ -28,16 +34,42 @@
             </span>
           </p>
           <div class="topic-box ksy-flex">
-            <span
-                v-for="num in Array.from({ length: group.end - group.start + 1 }, (_, i) => group.start + i)"
-                :key="num"
-                :class="{ 'selected-topic': isTopicSelected(groupIndex, num) }"
-                @click="scrollToQuestion(groupIndex, num)"
-            >
-              {{ num }}
-            </span>
+ <span
+     v-for="num in Array.from({ length: group.end - group.start + 1 }, (_, i) => group.start + i)"
+     :key="num"
+     :class="{
+    'selected-topic': isTopicSelected(groupIndex, num),
+    'flagged-topic': isTopicFlagged(groupIndex, num)
+  }"
+     @click="scrollToQuestion(groupIndex, num)"
+ >
+  <template v-if="isTopicFlagged(groupIndex, num)">
+    <el-icon size="12" color="#ff4d4f">
+      <Flag />
+    </el-icon>
+  </template>
+  <template v-else>
+    {{ num }}
+  </template>
+</span>
           </div>
         </article>
+      </div>
+      <div class="topic-sign">
+        <div class="legend-container">
+          <div class="legend-item">
+            <span class="legend-icon"></span>
+            未答题
+          </div>
+          <div class="legend-item">
+            <span class="legend-icon selected-topic"></span>
+            已作答
+          </div>
+          <div class="legend-item">
+            <el-icon size="12px" color="#ff4d4f"><flag/></el-icon>
+            已标记
+          </div>
+        </div>
       </div>
     </aside>
     <section class="test-middle-content">
@@ -67,7 +99,7 @@
             </span>
             <span class="subject-test-box">
               <p class="question-score">{{ group.name }}5.0分</p>
-              <el-icon size="16px" color="#aeaeae"><flag/></el-icon>
+              <el-icon class="flag-icon" size="16px" :color="question.flagged ? '#ff4d4f' : '#aeaeae'"  @click="toggleFlag(question)"><flag/></el-icon>
             </span>
             <div class="select-project-box">
               <ul>
@@ -95,9 +127,18 @@
     </section>
     <aside class="speed-box">
       <div class="schedule-time">
-        <div class="countdown-time">剩余时间</div>
-        <div class="progress-bar">答题进度</div>
+        <div class="countdown-time"><span>剩余时间</span><br><span class="time-col">19分44秒</span></div>
+        <div class="progress-bar">
+          <p>答题进度</p>
+          <div class="progress-text"><span>{{ answeredCount }}/{{ totalQuestions }}</span></div>
+          <el-progress
+              :percentage="progressPercentage"
+              :stroke-width="8"
+              :show-text="false"
+          />
+        </div>
       </div>
+      <el-button type="primary" class="test-end">交卷</el-button>
     </aside>
   </main>
 </template>
@@ -108,10 +149,17 @@ import { ref, onMounted, computed, reactive } from 'vue';
 import { useRoute } from 'vue-router';
 import { listQuestionsByIds } from '@/api/routineExams/question';
 import { getPaper } from '@/api/routineExams/paper';
+import {getUserProfile} from "@/api/system/user";
 
 const userStore = useUserStore();
 const route = useRoute();
 const questions = ref([]);
+const nickName = ref('')
+const progressPercentage = computed(() => {
+  return totalQuestions.value === 0
+      ? 0
+      : Math.round((answeredCount.value / totalQuestions.value) * 100);
+});
 
 // 按题型分组试题
 const groupedQuestions = computed(() => {
@@ -192,6 +240,31 @@ const isTopicSelected = (groupIndex, num) => {
     return !!question.selected;
   }
 };
+// 切换标记状态的方法
+const toggleFlag = (question) => {
+  question.flagged = !question.flagged;
+};
+
+// 判断是否被标记的方法
+const isTopicFlagged = (groupIndex, num) => {
+  const questionIndex = num - questionNumberMap.value[groupIndex].start;
+  const question = groupedQuestions.value[groupIndex].questions[questionIndex];
+  return question?.flagged || false;
+};
+
+const totalQuestions = computed(() => {
+  return questionNumberMap.value.reduce((total, group) =>
+      total + (group.end - group.start + 1), 0);
+});
+
+const answeredCount = computed(() => {
+  return questions.value.reduce((count, question) => {
+    if (question.type === 2) {
+      return question.selectedOptions?.length > 0 ? count + 1 : count;
+    }
+    return question.selected ? count + 1 : count;
+  }, 0);
+});
 
 // 选择选项
 const selectOption = (question, type, key) => {
@@ -228,8 +301,14 @@ const scrollToQuestion = (groupIndex, num) => {
     });
   }
 };
+function getUser() {
+  return getUserProfile().then((response) => {
+    nickName.value = response.data.nickName
+  })
+}
 
 onMounted(async () => {
+  await getUser();
   const examId = route.query.examId;
   if (examId) {
     try {
@@ -246,6 +325,7 @@ onMounted(async () => {
         questions.value = questionsResponse.data.map(q => reactive({
           ...q,
           selected: null,
+          flagged: false, // 新增标记属性
           selectedOptions: q.type === 2 ? [] : undefined
         }));
       }
@@ -262,6 +342,12 @@ onMounted(async () => {
 *{
   padding: 0;
   margin: 0;
+  box-sizing: border-box;
+}
+aside {
+  display: block;
+  unicode-bidi: isolate;
+  background: none; /* 移除背景颜色 */
 }
 .margin-number {
   margin: 20px 0;
@@ -297,33 +383,7 @@ onMounted(async () => {
   padding: 15px;
   border: 1px solid #eee;
 }
-@media screen and (max-width: 1280px) {
-  .test-main-content {
-    padding: 100px 10px; /* 缩小 padding */
-    gap: 10px; /* 缩小间距 */
-  }
 
-  .answer-sheet {
-    width: 200px; /* 缩小宽度 */
-  }
-
-  .speed-box {
-    width: 120px; /* 缩小宽度 */
-  }
-}
-
-@media screen and (max-width: 768px) {
-  .test-main-content {
-    flex-direction: column; /* 改为垂直布局 */
-    padding: 100px 10px;
-  }
-
-  .answer-sheet,
-  .speed-box {
-    width: 100%; /* 宽度占满 */
-    margin-bottom: 20px; /* 增加间距 */
-  }
-}
 :root {
   --primary-color: hsl(212, 87%, 30%);
   --border-color: #e7e7e7;
@@ -348,6 +408,20 @@ onMounted(async () => {
 .Exam-header-right {
   display: flex;
   align-items: center;
+}
+.status-box {
+  margin-right: 12px;
+  min-width: 2rem;
+  max-height: 1.5rem;
+  padding: 0.25rem 0.75rem 0.25rem 0.75rem;
+  background-color: #f6f7f9;
+  border-radius: 0.75rem;
+  white-space: nowrap;
+}
+.status-text {
+  color: hsl(0, 0%, 45%);
+  font-size: 0.8125rem;
+  line-height: 1rem;
 }
 
 .Dividing-Line {
@@ -374,42 +448,94 @@ onMounted(async () => {
 }
 
 .test-main-content {
-  padding: 100px 20px; /* 调整 padding，留出左右空间 */
-  min-height: 100vh; /* 至少占据整个视口的高度 */
+  padding: 100px 200px;
+  min-height: 100vh;
   display: flex;
-  justify-content: space-between; /* 左右两侧分别靠左和靠右 */
-  gap: 20px; /* 左右两侧与中间内容的间距 */
+  justify-content: space-between;
+  gap: 20px;
 }
 
 .test-middle-content {
   background-color: #fff;
-  flex: 1; /* 占据剩余空间 */
-  padding: 15px 20px; /* 调整内边距 */
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* 添加阴影 */
-  margin-left: 280px; /* 为答题卡留出空间 */
-  margin-right: 180px; /* 为剩余时间留出空间 */
+  flex: 1;
+  padding: 15px 20px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  /* 动态计算边距 */
+  margin-left: calc(260px + 20px); /* 答题卡宽度 + 间距 */
+  margin-right: calc(160px + 20px); /* 进度框宽度 + 间距 */
 }
 
 .test-main-content .answer-sheet {
-  width: 260px; /* 固定宽度 */
-  padding: 10px 8px 10px 15px;
-  background-color: #fff; /* 背景色 */
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* 添加阴影 */
-  position: fixed; /* 固定在页面上 */
-  top: 100px; /* 距离顶部 100px（根据 header 高度调整） */
-  left: 20px; /* 距离左侧 20px */
-  z-index: 1000; /* 确保在最上层 */
+  background-color: #fff;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  width: 280px;
+  /* 修改高度为自适应 */
+  min-height: 690px;  /* 最小高度 */
+  position: fixed;
+  left: 180px;
+  top: 100px;
+  display: flex;
+  flex-direction: column; /* 弹性布局管理内部内容 */
 }
 
 .test-main-content .speed-box {
-  width: 160px; /* 固定宽度 */
-  padding: 10px;
-  background-color: #fff; /* 背景色 */
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* 添加阴影 */
-  position: fixed; /* 固定在页面上 */
-  top: 100px; /* 距离顶部 100px（根据 header 高度调整） */
-  right: 20px; /* 距离右侧 20px */
-  z-index: 1000; /* 确保在最上层 */
+  width: 160px;
+  position: fixed;
+  right: 200px; /* 与父容器的padding-left对应 */
+  top: 100px;
+  padding: 0;
+  margin: 0;
+}
+
+@media screen and (max-width: 1680px) {
+  .test-main-content {
+    padding: 100px 100px;
+  }
+  .test-main-content .answer-sheet {
+    left: 100px;
+  }
+  .test-main-content .speed-box {
+    right: 100px;
+  }
+  .test-middle-content {
+    margin-left: calc(260px + 10px);
+    margin-right: calc(160px + 10px);
+  }
+}
+
+@media screen and (max-width: 1280px) {
+  .test-main-content {
+    padding: 100px 40px;
+  }
+  .test-main-content .answer-sheet {
+    left: 40px;
+    width: 220px;
+  }
+  .test-main-content .speed-box {
+    right: 40px;
+    width: 120px;
+  }
+  .test-middle-content {
+    margin-left: calc(220px + 10px);
+    margin-right: calc(120px + 10px);
+  }
+}
+
+@media screen and (max-width: 1024px) {
+  .test-main-content {
+    padding: 100px 20px;
+    flex-direction: column;
+  }
+  .test-main-content .answer-sheet,
+  .test-main-content .speed-box {
+    position: static;
+    width: 100%;
+    margin: 0 0 20px;
+  }
+  .test-middle-content {
+    margin: 0;
+    order: 1;
+  }
 }
 .title-line {
   background-color: var(--border-color);
@@ -426,9 +552,12 @@ onMounted(async () => {
 }
 
 .schedule-time {
+  background-color: #FFFFFF;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
   text-align: center;
   margin-bottom: 20px;
-  padding-bottom: 30px;
+  padding: 10px 8px 10px 15px;
 }
 
 .subject-box {
@@ -496,7 +625,9 @@ onMounted(async () => {
   margin-left: 20px;
 }
 .test-paper-middlebox{
+  flex: 1;
   overflow-y: auto;
+  height: 100%;
   margin-top: 10px;
 }
 .test-paper-middlebox .topic-box {
@@ -506,6 +637,41 @@ onMounted(async () => {
   margin: 10px 0;
   width: 100%;
   overflow: hidden;
+}
+.topic-sign {
+  border-top: 1px solid #e7e7e7;
+  padding: 10px 0;
+  width: 100%;
+  margin-top: 20px;
+  background-color: #fff; /* 背景色 */
+}
+
+.legend-container {
+  display: flex;
+  gap: 20px; /* 图例间距 */
+  padding: 10px 0;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: #666;
+}
+
+.legend-icon {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #ddd; /* 默认灰色边框 */
+  border-radius: 4px;
+  margin-right: 8px;
+  background-color: #cecece;
+}
+
+.legend-icon.selected-topic {
+  background-color: #c2e4ff; /* 已作答背景色 */
+  border-color: #c2e4ff; /* 边框颜色与背景一致 */
 }
 .topic-box span{
   flex: 0 0 15.2%;
@@ -532,4 +698,34 @@ ul, li {
   margin: 10px 0px 5px 0px;
   cursor: pointer;
 }
+.countdown-time{
+  border-bottom: 1px dashed #e7e7e7;
+}
+.time-col{
+  color: #e81515;
+}
+.progress-bar{
+  padding-bottom: 30px;
+}
+.progress-bar p{
+  margin-top: 5px;
+}
+.progress-bar span {
+  margin-bottom: 10px;
+  display: block;
+}
+.test-end{
+  width: 100%;
+  text-align: center;
+  height: 45px;
+  border-radius: 5px;
+  cursor: pointer;
+  background-color: #128beb;
+  color: #FFFFFF;
+}
+/* 标记图标样式 */
+.flag-icon {
+  cursor: pointer;
+}
+
 </style>

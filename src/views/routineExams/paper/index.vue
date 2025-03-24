@@ -136,7 +136,7 @@
         <!-- 动态规则 -->
         <div v-for="(rule, index) in form.rules" :key="index" class="rule-item">
           <el-form-item label="题型" :prop="`rules.${index}.questionType`">
-            <el-select v-model="rule.questionType" placeholder="选择题型">
+            <el-select v-model="rule.questionType" placeholder="选择题型" class="custom-width">
               <el-option
                   v-for="type in typeList"
                   :key="type.id"
@@ -146,20 +146,22 @@
             </el-select>
           </el-form-item>
           <el-form-item label="分值" :prop="`rules.${index}.questionScore`">
-            <el-input-number v-model="rule.questionScore" :min="1" :max="5"/>
+            <el-input-number v-model="rule.questionScore" :min="1" :max="5" class="custom-width"/>
           </el-form-item>
 
           <el-form-item label="数量" :prop="`rules.${index}.questionCount`">
-            <el-input-number v-model="rule.questionCount" :min="1" :max="20"/>
+            <el-input-number v-model="rule.questionCount" :min="1" :max="20" class="custom-width"/>
           </el-form-item>
 
           <el-form-item label="知识点" :prop="`rules.${index}.knowledgeId`">
             <el-select
+                class="custom-height-select"
                 v-model="rule.knowledgeId"
                 placeholder="选择知识点"
                 multiple
                 :filterable="true"
                 :reserve-keyword="false"
+                collapse-tags
             >
               <el-option
                   v-for="point in pointList"
@@ -438,10 +440,13 @@ onMounted(() => {
 
 .rule-item :deep(.el-form-item) {
   margin-bottom: 0;
-  margin-right: 15px;
+  margin-right: 10px;
 }
 
 .rule-item:last-child {
   margin-bottom: 0;
+}
+.custom-width {
+  width: 120px; /* 根据需要调整宽度 */
 }
 </style>
