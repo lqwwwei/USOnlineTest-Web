@@ -85,6 +85,12 @@ export const constantRoutes = [
     ]
   },
   {
+    path: '/notice',
+    name: 'NoticePage',
+    component: () => import('@/views/routineExams/notice/index'),
+    hidden: true
+  }, //告示页面
+  {
     path: '/exam',
     name: 'ExamPage',
     component: () => import('@/views/routineExams/exam/index'),

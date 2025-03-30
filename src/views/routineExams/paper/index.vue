@@ -201,7 +201,6 @@ import {onMounted, reactive, ref, toRefs, watch} from "vue";
 import {ElMessage, ElMessageBox} from "element-plus";
 import {listQuestiontype} from "@/api/routineExams/question";
 import {listPoint} from "@/api/routineExams/point";
-import { listQuestionsByIds } from '@/api/routineExams/question';
 import {useRouter} from "vue-router";
 const loading = ref(true);
 const showSearch = ref(true);
@@ -366,11 +365,12 @@ function preview(row) {
   }
 
   try {
+    console.log(row.id)
     // 跳转到目标页面，并传递试卷 ID
     router.push({
       name: 'ExamPage',
       query: {
-        examId: row.id // 传递试卷 ID
+        paperId: row.id // 传递试卷 ID
       }
     });
   } catch (error) {

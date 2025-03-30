@@ -212,10 +212,9 @@ export function getTime(type) {
 /**
  * @param {Function} func
  * @param {number} wait
- * @param {boolean} immediate
  * @return {*}
  */
-export function debounce(func, wait, immediate) {
+export function debounce(func, wait) {
   let timeout, args, context, timestamp, result
 
   const later = function() {

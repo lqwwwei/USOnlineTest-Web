@@ -150,11 +150,16 @@ import { useRoute } from 'vue-router';
 import { listQuestionsByIds } from '@/api/routineExams/question';
 import { getPaper } from '@/api/routineExams/paper';
 import {getUserProfile} from "@/api/system/user";
+import {addScore} from "@/api/routineExams/score";
+import { debounce } from 'lodash-es'
 
 const userStore = useUserStore();
 const route = useRoute();
 const questions = ref([]);
 const nickName = ref('')
+const userId = ref('')
+const examId = ref(route.query.examId)
+
 const progressPercentage = computed(() => {
   return totalQuestions.value === 0
       ? 0
@@ -233,7 +238,6 @@ const isTopicSelected = (groupIndex, num) => {
   const questionIndex = num - questionNumberMap.value[groupIndex].start;
   const question = groupedQuestions.value[groupIndex].questions[questionIndex];
   if (!question) return false;
-
   if (question.type === 2) {
     return question.selectedOptions?.length > 0;
   } else {
@@ -266,6 +270,25 @@ const answeredCount = computed(() => {
   }, 0);
 });
 
+const getCurrentAnswer = (question, type) => {
+  if (type === 1) { // 判断题
+    return question.selected === 'A' ? 'T' : 'F'
+  }
+  if (type === 2) { // 多选题
+    return question.selectedOptions?.join(',') || ''
+  }
+  return question.selected || '' // 单选题
+}
+
+
+const submitAnswer = debounce(async (params) => {
+  try {
+    await addScore(params)
+  } catch (error) {
+    console.error('答案保存失败:', error)
+  }
+}, 500)
+
 // 选择选项
 const selectOption = (question, type, key) => {
   const option = String.fromCharCode(65 + key);
@@ -280,6 +303,12 @@ const selectOption = (question, type, key) => {
   } else {
     question.selected = question.selected === option ? null : option;
   }
+  submitAnswer({
+    examId: examId.value,
+    userId: userId.value,
+    questionId: question.id,
+    userAnswer: getCurrentAnswer(question, type),
+  })
 };
 
 // 滚动到对应题目
@@ -304,15 +333,15 @@ const scrollToQuestion = (groupIndex, num) => {
 function getUser() {
   return getUserProfile().then((response) => {
     nickName.value = response.data.nickName
+    userId.value=response.data.userId
   })
 }
 
 onMounted(async () => {
-  await getUser();
-  const examId = route.query.examId;
-  if (examId) {
+  await getUser()
+  const paperId = route.query.paperId;
     try {
-      const paperResponse = await getPaper(examId);
+      const paperResponse = await getPaper(paperId);
       const paperData = paperResponse.data;
       const questionIds = paperData.questionIds;
 
@@ -332,7 +361,6 @@ onMounted(async () => {
     } catch (error) {
       console.error('获取数据失败:', error);
     }
-  }
 });
 </script>
 
@@ -498,8 +526,8 @@ aside {
     right: 100px;
   }
   .test-middle-content {
-    margin-left: calc(260px + 10px);
-    margin-right: calc(160px + 10px);
+    margin-left: calc(260px);
+    margin-right: calc(160px);
   }
 }
 
@@ -516,8 +544,8 @@ aside {
     width: 120px;
   }
   .test-middle-content {
-    margin-left: calc(220px + 10px);
-    margin-right: calc(120px + 10px);
+    margin-left: calc(220px);
+    margin-right: calc(120px);
   }
 }
 
