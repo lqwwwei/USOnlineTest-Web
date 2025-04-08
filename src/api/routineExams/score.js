@@ -42,3 +42,14 @@ export function delScore(id) {
     method: 'delete'
   })
 }
+// 在api文件中添加
+export function answerRecode(examId, userId) {
+  return request({
+    url: '/system/score/getAnswerRecord',
+    method: 'get',
+    params: {
+      examId,
+      userId
+    }
+  })
+}
