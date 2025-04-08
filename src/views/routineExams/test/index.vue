@@ -106,7 +106,7 @@
               name: userTreeData.find(u => u.userId == id)?.nickName || id
             }))
         "
-                :height="200"
+                :height="300"
                 border
                 scrollbar-always-on
             >
@@ -125,7 +125,7 @@
         </template>
       </el-table-column>
       <el-table-column label="实考人员" align="center" prop="attendeeIds">
-        <template #default="{ row }"> <!-- 修正作用域参数 -->
+        <template #default="{ row }">
           <el-popover
               placement="right"
               :width="300"
@@ -134,7 +134,7 @@
           >
           <el-table
               :data="getAttendanceData(row)"
-              :height="200"
+              :height="300"
               border
               scrollbar-always-on
           >
@@ -187,8 +187,15 @@
               type="primary"
               icon="EditPen"
               @click="startTest(row)"
-              v-hasPermi="['system:exams:remove']"
+              v-hasPermi="['system:exams:start']"
           >开始考试
+          </el-button>
+          <el-button
+              link
+              type="primary"
+              icon="View"
+              @click="checkScore(row)"
+          >查看成绩
           </el-button>
         </template>
       </el-table-column>
@@ -262,10 +269,11 @@
                 show-checkbox
                 ref="userTreeRef"
                 node-key="userId"
+                :filter-node-method="filterUserNode"
                 :props="{
-        label: 'nickName',
-        children: 'children'
-      }"
+      label: 'nickName',
+      children: 'children'
+    }"
                 @check="handleUserCheck"
             >
               <template #default="{ node, data }">
@@ -307,17 +315,25 @@
         <el-button @click="cancel">取 消</el-button>
       </div>
     </el-dialog>
+
+    <el-dialog title="答题详情" v-model="check" width="1050px" append-to-body>
+      <AnswerDetailTable v-if="rawData.length > 0" :rawData="rawData" />
+      <el-empty v-else description="加载中..." />
+    </el-dialog>
   </div>
 </template>
 
 
 <script setup>
-import {ref, reactive, onMounted, toRefs} from 'vue';
+import {ref, reactive, onMounted, toRefs, nextTick} from 'vue';
 import {ElMessageBox, ElMessage} from 'element-plus';
 import {listExams, getExams, delExams, addExams, updateExams, userWithRole} from "@/api/routineExams/exams";
 import {listPaper} from "@/api/routineExams/paper";
 import {useRouter} from "vue-router";
-
+import {checkRole} from "@/utils/permission";
+import {getUserProfile} from "@/api/system/user";
+import {answerRecode} from "@/api/routineExams/score";
+import AnswerDetailTable from '@/components/AnswerDetailTable/index.vue'
 const loading = ref(true);
 const ids = ref([]);
 const single = ref(true);
@@ -328,6 +344,7 @@ const examsList = ref([]);
 const paperList = ref([]);
 const title = ref("");
 const open = ref(false);
+const check = ref(false);
 const queryForm = ref(null);
 const router = useRouter()
 const userTreeData = ref([]);
@@ -335,7 +352,8 @@ const userTreeRef = ref(null);
 const userNodeAll = ref(false);
 const userNameKeyword = ref('');
 const userIdKeyword = ref('');
-const examAttendees = ref([])
+const userId = ref('')
+const rawData = ref([])
 const data = reactive({
       queryParams: {
         pageNum: 1,
@@ -395,39 +413,45 @@ const data = reactive({
 const {queryParams, form, rules, examTypeOptions, examStatusOptions} = toRefs(data)
 // 生命周期钩子
 onMounted(() => {
+  getUser();
   getList();
   loadUserData()
-  listPaper().then(response => {
+  if (checkRole(['chief']) || checkRole(['admin'])){
+    listPaper().then(response => {
     paperList.value = response.rows;
   })
+  }
 });
 const loadUserData = async () => {
   try {
     const res = await userWithRole();
     userTreeData.value = (res.data || [])
-        .filter(user => user.roles && user.roles.some(role =>
-            role.roleKey && ['chief', 'physician'].includes(role.roleKey.toLowerCase())
-        ))
-        .map(user => ({
+        .filter((user) =>
+            user.roles?.some((role) =>
+                ["chief", "physician"].includes(role.roleKey?.toLowerCase())
+            )
+        )
+        .map((user) => ({
           userId: user.userId,
           nickName: user.nickName,
-          userName: user.userName
+          userName: user.userName,
         }));
   } catch (error) {
-    console.error('加载用户数据失败:', error);
+    console.error("加载用户数据失败:", error);
   }
 };
-
 const handleUserCheck = (checkedNodes, { checkedKeys }) => {
   form.value.candidateIds = checkedKeys;
 };
 
 // 处理全选
+// 处理全选
 const handleUserTreeNodeAll = (val) => {
   const allKeys = userTreeData.value.map(user => user.userId);
   userTreeRef.value.setCheckedKeys(val ? allKeys : []);
+  // 更新form.candidateIds
+  form.value.candidateIds = val ? allKeys : [];
 };
-
 
 function formatExamType(examType) {
   return examType === 0 ? '闭卷' : '开卷';
@@ -471,13 +495,27 @@ function handleAdd() {
   title.value = "新增考试";
 }
 
-function handleUpdate(row) {
+async function handleUpdate(row) {
+  open.value = true;
+  title.value = "修改考试";
   resetForm();
   const examId = row.examId || ids.value;
-  getExams(examId).then(response => {
-    form.value = response.data; // 直接赋值给form.value
-    open.value = true;
-    title.value = "修改考试";
+  getExams(examId).then(async (response) => {
+    form.value = response.data;
+    await loadUserData(); // 确保用户数据加载完成
+
+    try {
+      const candidateIds = JSON.parse(form.value.candidateIds || "[]");
+      await nextTick(); // 确保树组件已渲染
+      if (userTreeRef.value) {
+        userTreeRef.value.setCheckedKeys(candidateIds);
+      } else {
+        console.error("userTreeRef 未初始化");
+      }
+    } catch (e) {
+      console.error("解析 candidateIds 失败:", e);
+    }
+
   });
 }
 
@@ -567,6 +605,7 @@ function resetForm() {
     attendeeIds: null,
     createTime: null
   };
+
   userTreeRef.value?.setCheckedKeys([]);
   userNameKeyword.value = '';
   userIdKeyword.value = '';
@@ -597,6 +636,43 @@ const getAttendanceData = (row) => {
   }
 }
 
+
+// 正确调用方式
+function checkScore(row) {
+  answerRecode(row.examId, userId.value).then(response => {
+    if (response.data) {
+      rawData.value = response.data
+      console.log(666)
+      console.log(rawData.value)
+    }
+  })
+  check.value = true
+}
+function getUser() {
+  return getUserProfile().then((response) => {
+      userId.value = response.data.userId
+
+  })
+}
+const handleUserSearch = () => {
+  // 触发树过滤
+  userTreeRef.value.filter('')
+  // 自动选中匹配项
+  nextTick(() => {
+    const matchedKeys = userTreeData.value
+        .filter(user =>
+            user.nickName.toLowerCase().includes(userNameKeyword.value.toLowerCase()) &&
+            user.userId.toString().includes(userIdKeyword.value)
+                .map(user => user.userId))
+    userTreeRef.value.setCheckedKeys(matchedKeys)
+  })
+}
+
+const filterUserNode = (value, data) => {
+  const nameMatch = data.nickName.toLowerCase().includes(userNameKeyword.value.toLowerCase())
+  const idMatch = data.userId.toString().includes(userIdKeyword.value)
+  return nameMatch && idMatch
+}
 
 </script>
 <style scoped>

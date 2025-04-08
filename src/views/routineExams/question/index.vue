@@ -232,6 +232,7 @@
                     :underline="false"
                     style="font-size:12px;vertical-align: baseline;"
                     @click="importTemplate"
+                    v-hasPermi="['system:question:Template']"
                 >
                   下载模板
                 </el-link>

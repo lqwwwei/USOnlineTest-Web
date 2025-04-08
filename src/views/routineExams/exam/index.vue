@@ -138,9 +138,18 @@
           />
         </div>
       </div>
-      <el-button type="primary" class="test-end">交卷</el-button>
+      <el-button type="primary" class="test-end" @click="finished=true">交卷</el-button>
     </aside>
   </main>
+  <el-dialog v-model="finished" title="结束考试" width="500" align-center>
+    <span>是否确认提交？</span>
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="finished = false">取消</el-button>
+        <el-button type="primary" @click="submit"> 提交 </el-button>
+      </div>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -152,6 +161,7 @@ import { getPaper } from '@/api/routineExams/paper';
 import {getUserProfile} from "@/api/system/user";
 import {addScore} from "@/api/routineExams/score";
 import { debounce } from 'lodash-es'
+import {addResults} from "@/api/routineExams/results";
 
 const userStore = useUserStore();
 const route = useRoute();
@@ -159,7 +169,7 @@ const questions = ref([]);
 const nickName = ref('')
 const userId = ref('')
 const examId = ref(route.query.examId)
-
+const finished = ref(false)
 const progressPercentage = computed(() => {
   return totalQuestions.value === 0
       ? 0
@@ -289,6 +299,15 @@ const submitAnswer = debounce(async (params) => {
   }
 }, 500)
 
+function submit(){
+  const data = {
+    userId: userId.value,
+    examId: examId.value,
+    paperId: route.query.paperId,
+  };
+  addResults(data)
+  finished.value=false;
+}
 // 选择选项
 const selectOption = (question, type, key) => {
   const option = String.fromCharCode(65 + key);

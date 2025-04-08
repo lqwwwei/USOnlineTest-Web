@@ -9,10 +9,10 @@
             @keyup.enter.native="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="创建人" prop="createdBy">
+      <el-form-item label="出卷人" prop="createdBy">
         <el-input
             v-model="queryParams.createdBy"
-            placeholder="请输入创建人"
+            placeholder="请输入出卷人"
             clearable
             @keyup.enter.native="handleQuery"
         />
@@ -82,7 +82,7 @@
       <el-table-column label="试卷名称" align="center" prop="title"/>
       <el-table-column label="试卷总分" align="center" prop="totalScore"/>
       <el-table-column label="及格分数" align="center" prop="passScore"/>
-      <el-table-column label="创建人" align="center" prop="createdBy"/>
+      <el-table-column label="出卷人" align="center" prop="createdBy"/>
       <el-table-column label="创建时间" align="center" prop="createdAt" width="180">
       </el-table-column>
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
@@ -150,7 +150,7 @@
           </el-form-item>
 
           <el-form-item label="数量" :prop="`rules.${index}.questionCount`">
-            <el-input-number v-model="rule.questionCount" :min="1" :max="20" class="custom-width"/>
+            <el-input-number v-model="rule.questionCount" :min="1" :max="10" class="custom-width"/>
           </el-form-item>
 
           <el-form-item label="知识点" :prop="`rules.${index}.knowledgeId`">
